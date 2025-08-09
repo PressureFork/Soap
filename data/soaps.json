@@ -1,0 +1,13 @@
+{
+    "soaps": [
+        {
+            "id": "the-show",
+            "name": "The Show",
+            "logo": "https://soap.fast-page.org/theshow.png",
+            "status": "published",
+            "episodes": [],
+            "cast": [],
+            "news": []
+        }
+    ]
+}

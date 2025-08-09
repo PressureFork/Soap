@@ -91,6 +91,11 @@ if (isset($_GET['view']) && $_GET['view'] === 'public') {
             footer { text-align: center; padding: 20px; margin-top: 30px; font-size: 0.9em; color: rgba(255,255,255,0.7); }
             .social-links a { color: rgba(255,255,255,0.7); margin: 0 10px; font-size: 1.5em; transition: color 0.3s; }
             .social-links a:hover { color: var(--accent-color); }
+            .cast-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7em; font-weight: 600; margin-left: 10px; vertical-align: middle; }
+            .cast-status.active { background: rgba(0,208,132,.12); color: #9ff2d2; border: 1px solid rgba(0,208,132,.3);}
+            .cast-status.recurring { background: rgba(46,170,220,.12); color: #b5e8fb; border: 1px solid rgba(46,170,220,.3);}
+            .cast-status.guest { background: rgba(255,153,0,.12); color: #ffcc80; border: 1px solid rgba(255,153,0,.3);}
+            .cast-status.former { background: rgba(255,90,95,.12); color: #ffd5da; border: 1px solid rgba(255,90,95,.3);}
             <?= $custom_css ?>
         </style>
     </head>
@@ -109,7 +114,7 @@ if (isset($_GET['view']) && $_GET['view'] === 'public') {
         <?php if(!empty($cast)): ?><section id="cast"><h2>Cast</h2><div class="grid">
         <?php foreach ($cast as $member): ?><div class="card">
             <?php if(!empty($member['photo'])): ?><img src="<?= htmlspecialchars($member['photo']) ?>" alt="<?= htmlspecialchars($member['name']) ?>"><?php endif; ?>
-            <div class="card-content"><h3><?= htmlspecialchars($member['name']) ?></h3><p><?= nl2br(htmlspecialchars($member['bio'] ?? '')) ?></p></div>
+            <div class="card-content"><h3><?= htmlspecialchars($member['name']) ?><?php if (!empty($member['status'])): ?><span class="cast-status <?=h($member['status'])?>"><?=h(ucfirst($member['status']))?></span><?php endif; ?></h3><p><?= nl2br(htmlspecialchars($member['bio'] ?? '')) ?></p></div>
         </div><?php endforeach; ?></div></section><?php endif; ?>
         <?php if(!empty($episodes)): ?><section id="episodes"><h2>Episodes</h2><div class="grid">
         <?php foreach ($episodes as $ep): ?><div class="card">
@@ -255,7 +260,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf($_POST['csrf
     elseif ($context === 'soap' && $current_soap) {
         $soap_data_dir = DATA_DIR . DS . $current_soap['id']; $soap_uploads_dir = UPLOADS_DIR . DS . $current_soap['id'];
         $module_configs = [
-            'cast' => ['file' => 'cast.json', 'key' => 'cast', 'id_field' => 'item_id', 'fields' => ['name' => 'text', 'bio' => 'textarea', 'photo' => 'file']],
+            'cast' => ['file' => 'cast.json', 'key' => 'cast', 'id_field' => 'item_id', 'fields' => ['name' => 'text', 'status' => 'select', 'bio' => 'textarea', 'photo' => 'file']],
             'episodes' => ['file' => 'episodes.json', 'key' => 'episodes', 'id_field' => 'item_id', 'fields' => ['title' => 'text', 'summary' => 'textarea', 'thumbnail' => 'file']],
             'news' => ['file' => 'news.json', 'key' => 'news', 'id_field' => 'item_id', 'fields' => ['headline' => 'text', 'body' => 'textarea-html']],
         ];
@@ -380,6 +385,8 @@ function render_crud_page(string $title, string $page_key, array $soap, string $
                     </form>
                 <?php elseif (in_array($col_key, ['photo', 'thumbnail'])): ?>
                     <?php if (!empty($item[$col_key])): ?><img class="logo" src="<?= h($item[$col_key]) ?>" alt="image"><?php else: ?><div class="logo logo-placeholder"><i class="fa-solid fa-image"></i></div><?php endif; ?>
+                <?php elseif ($col_key === 'status'): ?>
+                    <span class="status <?=h($item['status'] ?? '')?>"><?=h(ucfirst($item['status'] ?? ''))?></span>
                 <?php else: ?><strong><?= h($item[$col_key] ?? '') ?></strong><?php endif; ?>
             </td><?php endforeach; ?></tr>
         <?php endforeach; endif; ?>
@@ -420,6 +427,12 @@ function render_crud_modal(string $title, string $page_key, string $csrf, array 
                     <?php if ($field['type'] === 'textarea'): ?><textarea id="<?= $page_key ?>_<?= $key ?>" name="<?= $key ?>" rows="5"></textarea>
                     <?php elseif ($field['type'] === 'textarea-html'): ?><textarea class="tinymce-basic" id="<?= $page_key ?>_<?= $key ?>" name="<?= $key ?>" rows="8"></textarea>
                     <?php elseif ($field['type'] === 'file'): ?><input type="file" id="<?= $page_key ?>_<?= $key ?>" name="<?= $key ?>" accept="<?= implode(',', array_keys($GLOBALS['ALLOWED_MIME'])) ?>" />
+                    <?php elseif ($field['type'] === 'select' && !empty($field['options'])): ?>
+                        <select id="<?= $page_key ?>_<?= $key ?>" name="<?= $key ?>">
+                            <?php foreach($field['options'] as $option_value => $option_label): ?>
+                                <option value="<?= h((string)$option_value) ?>"><?= h($option_label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     <?php else: ?><input type="text" id="<?= $page_key ?>_<?= $key ?>" name="<?= $key ?>" required /><?php endif; ?>
                 </div><?php endforeach; ?>
                 <div style="margin-top:16px; display:flex; gap:10px;"><button class="btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save</button></div>
@@ -462,6 +475,10 @@ function render_crud_modal(string $title, string $page_key, string $csrf, array 
     .status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
     .status.published { background: rgba(0,208,132,.12); color: #9ff2d2; border: 1px solid rgba(0,208,132,.3);}
     .status.draft { background: rgba(46,170,220,.12); color: #b5e8fb; border: 1px solid rgba(46,170,220,.3);}
+    .status.active { background: rgba(0,208,132,.12); color: #9ff2d2; border: 1px solid rgba(0,208,132,.3);}
+    .status.recurring { background: rgba(46,170,220,.12); color: #b5e8fb; border: 1px solid rgba(46,170,220,.3);}
+    .status.guest { background: rgba(255,153,0,.12); color: #ffcc80; border: 1px solid rgba(255,153,0,.3);}
+    .status.former { background: rgba(255,90,95,.12); color: #ffd5da; border: 1px solid rgba(255,90,95,.3);}
     .actions-group { display: flex; gap: 6px; align-items: center; } .action-form { margin: 0; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 2000; }
     .modal { width: min(600px, 95vw); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
@@ -510,7 +527,7 @@ function render_crud_modal(string $title, string $page_key, string $csrf, array 
             if ($context === 'global') { render_global_dashboard($all_soaps, $csrf); }
             elseif ($context === 'soap' && $current_soap) {
                 switch ($page) {
-                    case 'cast': render_crud_page('Cast', 'cast', $current_soap, $csrf, ['photo' => 'Photo', 'name' => 'Name', 'actions' => 'Actions']); break;
+                    case 'cast': render_crud_page('Cast', 'cast', $current_soap, $csrf, ['photo' => 'Photo', 'name' => 'Name', 'status' => 'Status', 'actions' => 'Actions']); break;
                     case 'episodes': render_crud_page('Episodes', 'episodes', $current_soap, $csrf, ['thumbnail' => 'Thumbnail', 'title' => 'Title', 'actions' => 'Actions']); break;
                     case 'news': render_crud_page('News', 'news', $current_soap, $csrf, ['headline' => 'Headline', 'actions' => 'Actions']); break;
                     case 'settings': render_settings_page($current_soap, $csrf, $GOOGLE_FONTS); break;
@@ -534,7 +551,12 @@ function render_crud_modal(string $title, string $page_key, string $csrf, array 
         </form>
     </div></div>
     <?php if ($context === 'soap'):
-        render_crud_modal('Cast Member', 'cast', $csrf, ['name' => ['label' => 'Character Name', 'type' => 'text'], 'photo' => ['label' => 'Photo', 'type' => 'file'], 'bio' => ['label' => 'Biography', 'type' => 'textarea']]);
+        render_crud_modal('Cast Member', 'cast', $csrf, [
+            'name' => ['label' => 'Character Name', 'type' => 'text'],
+            'status' => ['label' => 'Status', 'type' => 'select', 'options' => ['active' => 'Active', 'recurring' => 'Recurring', 'guest' => 'Guest', 'former' => 'Former']],
+            'photo' => ['label' => 'Photo', 'type' => 'file'],
+            'bio' => ['label' => 'Biography', 'type' => 'textarea']
+        ]);
         render_crud_modal('Episode', 'episodes', $csrf, ['title' => ['label' => 'Episode Title', 'type' => 'text'], 'thumbnail' => ['label' => 'Thumbnail', 'type' => 'file'], 'summary' => ['label' => 'Summary', 'type' => 'textarea']]);
         render_crud_modal('News Article', 'news', $csrf, ['headline' => ['label' => 'Headline', 'type' => 'text'], 'body' => ['label' => 'Body', 'type' => 'textarea-html']]);
     endif; ?>
